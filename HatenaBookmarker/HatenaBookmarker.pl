@@ -27,7 +27,8 @@ my $plugin = __PACKAGE__->new({
     blog_config_template => 'config.tmpl',
     settings             => new MT::PluginSettings([
 	['hatena_username', { Default => '' }],
-	['hatena_password', { Default => '' }]
+	['hatena_password', { Default => '' }],
+	['hatena_bm_title', { Default => q(<$MTBlogName encode_html="1"$>: <$MTEntryTitle encode_html="1"$>) }],
     ])
 });
 MT->add_plugin($plugin);
@@ -103,8 +104,11 @@ sub bookmark_entries {
     for my $entry_id (@entry_ids) {
 	my $entry = $class->load($entry_id)
 	    or return $app->error($plugin->translate('Invalid entry_id'));
-	bookmark_entry($app, $entry)
-	    if $entry->status == MT::Entry::RELEASE();
+	if ($entry->status == MT::Entry::RELEASE()) {
+	    MT::Util::start_background_task(
+		sub { bookmark_entry($app, $entry) }
+	    );
+	}
     }
     $app->call_return;
 }
@@ -152,7 +156,7 @@ sub bookmark_entry {
 
     my $saved_title   = $bookmark->title;
     my $saved_summary = extract_summary($bookmark);
-    my $title         = $entry->blog->name . ': ' . $entry->title;
+    my $title         = format_bm_title($config->{hatena_bm_title}, $entry);
     my $summary       = tags2summary($entry) || keywords2summary($entry->keywords) || '';
 
     my $enc = $app->config->PublishCharset || 'utf-8';
@@ -189,12 +193,29 @@ sub bookmark_entry {
     }
 }
 
+# format bookmark title
+use MT::Template::Context;
+use MT::Builder;
+sub format_bm_title {
+    my ($format, $entry) = @_;
+    my $ctx = MT::Template::Context->new;
+    $ctx->stash('entry', $entry);
+    $ctx->stash('blog' , $entry->blog);
+    my $builder = MT::Builder->new;
+    my $tokens = $builder->compile($ctx, $format)
+	or return $ctx->error($builder->errstr);
+    defined(my $title = $builder->build($ctx, $tokens))
+	or return $ctx->error($builder->errstr);
+
+    $title;
+}
+
 # extract summary text from a hatena entry
 sub extract_summary {
-    my ($entry) = @_;
+    my $entry = shift;
     my $summary = '';
-    my $dc = XML::Atom::Namespace->new(dc => 'http://purl.org/dc/elements/1.1/');
-    for my $subject ($entry->getlist($dc, 'subject')) {
+    my $dc_ns = 'http://purl.org/dc/elements/1.1/';
+    for my $subject ($entry->getlist($dc_ns, 'subject')) {
 	$summary .= '[' . $subject . ']';
     }
     $summary;
@@ -202,7 +223,7 @@ sub extract_summary {
 
 # convert MT keywords to summary text
 sub keywords2summary {
-    my ($str) = @_;
+    my $str = shift;
     return '' unless $str;
     $str =~ s/\#.*$//g;
     $str =~ s/(^\s+|\s+$)//g;
