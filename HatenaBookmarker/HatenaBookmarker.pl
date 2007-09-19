@@ -34,14 +34,40 @@ MT->add_plugin($plugin);
 
 sub init_registry {
     my $plugin = shift;
-    my $callbacks;
-    if (MT->instance->isa('MT::App::CMS')) {
-	$callbacks = { 'cms_post_save.entry' => \&cms_post_save_entry };
-    } else {
-	$callbacks = { 'MT::Entry::post_save' => \&post_save_entry };
+    if (!MT->instance->isa('MT::App::CMS')) {
+	$plugin->registry({
+	    callbacks => {
+		'MT::Entry::post_save' => \&post_save_entry
+	    }
+	});
+	return;
     }
     $plugin->registry({
-	callbacks => $callbacks
+	callbacks => {
+	    'cms_post_save.entry' => \&cms_post_save_entry
+	},
+	applications => {
+	    cms => {
+		list_actions => {
+		    entry => {
+			bookmark_entry => {
+			    label           => $plugin->translate('Bookmark Entries'),
+			    continue_prompt => $plugin->translate('Are you sure you want to bookmark the selected entries?'),
+			    code            => \&bookmark_entries,
+			    permission      => 'create_post',
+			}
+		    },
+		    page => {
+			bookmark_page => {
+			    label           => $plugin->translate('Bookmark Pages'),
+			    continue_prompt => $plugin->translate('Are you sure you want to bookmark the selected pages?'),
+			    code            => \&bookmark_entries,
+			    permission      => 'create_post',
+			}
+		    },
+		}
+	    }
+	}
     });
 }
 
@@ -50,7 +76,7 @@ sub post_save_entry {
     my ($entry) = @_;
     return unless $entry->isa('MT::Entry') && $entry->status == MT::Entry::RELEASE();
     MT::Util::start_background_task(
-	sub { do_bookmark(MT->instance, $entry) }
+	sub { bookmark_entry(MT->instance, $entry) }
     );
 }
 
@@ -59,15 +85,35 @@ sub cms_post_save_entry {
     my ($app, $entry) = @_;
     return unless $entry->isa('MT::Entry') && $entry->status == MT::Entry::RELEASE();
     MT::Util::start_background_task(
-	sub { do_bookmark($app, $entry) }
+	sub { bookmark_entry($app, $entry) }
     );
+}
+
+sub bookmark_entries {
+    my $app = shift;
+    my $perms = $app->permissions;
+    return $app->trans_error('Permission Denied.')
+	unless $perms && $perms->can_create_post;
+
+    my $type = $app->param('_type') || 'entry';
+    my $class = MT->model($type);
+
+    my @entry_ids = $app->param('id')
+	or return $app->error($plugin->translate('No [_1] was selected to bookmark.', $type));
+    for my $entry_id (@entry_ids) {
+	my $entry = $class->load($entry_id)
+	    or return $app->error($plugin->translate('Invalid entry_id'));
+	bookmark_entry($app, $entry)
+	    if $entry->status == MT::Entry::RELEASE();
+    }
+    $app->call_return;
 }
 
 use MT::Log;
 use MT::I18N;
 use HatenaBookmarker::Client;
 
-sub do_bookmark {
+sub bookmark_entry {
     my ($app, $entry) = @_;
 
     my $blog_id = $entry->blog_id;

@@ -13,6 +13,10 @@ our %Lexicon = (
     'Entry (ID:[_1]) has been successfully bookmarked.' => 'エントリ (ID:[_1]) は正常にブックマークされました。',
     'Hatena Username' => 'はてなIDのユーザ名',
     'Hatena Password' => 'はてなIDのパスワード',
+    'Bookmark Entries' => 'ブログ記事のブックマーク',
+    'Are you sure you want to bookmark the selected entries?' => '選択したブログ記事をブックマークしてよろしいですか?',
+    'Bookmark Pages' => 'ウェブページのブックマーク',
+    'Are you sure you want to bookmark the selected entries?' => '選択したウェブページをブックマークしてよろしいですか?',
 );
 
 1;
