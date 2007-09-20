@@ -13,7 +13,7 @@ use base qw(MT::Plugin);
 
 use MT;
 
-our $VERSION = '0.01';
+our $VERSION = '0.10';
 
 my $plugin = __PACKAGE__->new({
     id                   => 'hatena_bookmaker',
@@ -32,6 +32,8 @@ my $plugin = __PACKAGE__->new({
     ])
 });
 MT->add_plugin($plugin);
+
+sub instance { $plugin }
 
 sub init_registry {
     my $plugin = shift;
@@ -72,6 +74,9 @@ sub init_registry {
     });
 }
 
+##
+## handlers
+##
 sub post_save_entry {
     my $class = shift;
     my ($entry) = @_;
@@ -101,18 +106,23 @@ sub bookmark_entries {
 
     my @entry_ids = $app->param('id')
 	or return $app->error($plugin->translate('No [_1] was selected to bookmark.', $type));
-    for my $entry_id (@entry_ids) {
-	my $entry = $class->load($entry_id)
-	    or return $app->error($plugin->translate('Invalid entry_id'));
-	if ($entry->status == MT::Entry::RELEASE()) {
-	    MT::Util::start_background_task(
-		sub { bookmark_entry($app, $entry) }
-	    );
+    MT::Util::start_background_task(
+	sub {
+	    for my $entry_id (@entry_ids) {
+		my $entry = $class->load($entry_id)
+		    or return $app->error($plugin->translate('Invalid entry_id'));
+		if ($entry->status == MT::Entry::RELEASE()) {
+		    bookmark_entry($app, $entry);
+		}
+	    }
 	}
-    }
+    );
     $app->call_return;
 }
 
+##
+## main
+##
 use MT::Log;
 use MT::I18N;
 use HatenaBookmarker::Client;
@@ -155,9 +165,9 @@ sub bookmark_entry {
     }
 
     my $saved_title   = $bookmark->title;
-    my $saved_summary = extract_summary($bookmark);
+    my $saved_summary = get_bookmark_summary($bookmark);
     my $title         = format_bm_title($config->{hatena_bm_title}, $entry);
-    my $summary       = tags2summary($entry) || keywords2summary($entry->keywords) || '';
+    my $summary       = get_entry_summary($entry);
 
     my $enc = $app->config->PublishCharset || 'utf-8';
     $title   = MT::I18N::encode_text($title  , $enc, 'utf-8') if $title  ;
@@ -193,6 +203,10 @@ sub bookmark_entry {
     }
 }
 
+##
+## utilities
+##
+
 # format bookmark title
 use MT::Template::Context;
 use MT::Builder;
@@ -211,7 +225,7 @@ sub format_bm_title {
 }
 
 # extract summary text from a hatena entry
-sub extract_summary {
+sub get_bookmark_summary {
     my $entry = shift;
     my $summary = '';
     my $dc_ns = 'http://purl.org/dc/elements/1.1/';
@@ -221,43 +235,49 @@ sub extract_summary {
     $summary;
 }
 
-# convert MT keywords to summary text
-sub keywords2summary {
-    my $str = shift;
-    return '' unless $str;
+# extract summary text from an MT entry
+sub get_entry_summary {
+    my $entry = shift;
+    tags_to_text($entry) || keywords_to_text($entry) || '';
+}
+
+# convert entry tags to a flattened text
+sub tags_to_text {
+    my $entry = shift;
+    return '' unless $entry->can('tags');
+
+    my $text = '';
+    for my $tag ($entry->tags) {
+	$text .= '[' . $tag . ']';
+    }
+    $text;
+}
+
+# convert entry keywords to a flattened text
+sub keywords_to_text {
+    my $entry = shift;
+    my $str = $entry->keywords or return '';
     $str =~ s/\#.*$//g;
     $str =~ s/(^\s+|\s+$)//g;
     return '' unless $str;
 
-    my $summary = '';
+    my $text = '';
     if ($str =~ m/[;,|]/) {
 	# separated by non-whitespaces
 	while ($str =~ m/(\[[^]]+\]|"[^"]+"|'[^']+'|[^;,|]+)/g) {
 	    my $tag = $1;
 	    $tag =~ s/(^[\["'\s;,|]+|[\]"'\s;,|]+$)//g;
-	    $summary .= '[' . $tag . ']' if $tag;
+	    $text .= '[' . $tag . ']' if $tag;
 	}
     } else {
 	# separated by whitespaces
 	while ($str =~ m/(\[[^]]+\]|"[^"]+"|'[^']+'|[^\s]+)/g) {
 	    my $tag = $1;
 	    $tag =~ s/(^[\["'\s]+|[\]"'\s]+$)//g;
-	    $summary .= '[' . $tag . ']' if $tag;
+	    $text .= '[' . $tag . ']' if $tag;
 	}
     }
-    $summary;
-}
-
-# convert MT tags to summary text
-sub tags2summary {
-    my $entry = shift;
-    return '' unless $entry->can('tags');
-
-    my $summary = '';
-    for my $tag ($entry->tags) {
-	$summary .= '[' . $tag . ']';
-    }
-    $summary;
+    $text;
 }
 
 1;
