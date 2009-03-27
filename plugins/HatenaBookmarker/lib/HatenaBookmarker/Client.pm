@@ -13,8 +13,10 @@ sub createBookmarkEntry {
     my ($param) = @_;
 
     my $entry = XML::Atom::Entry->new;
-    $entry->title( $param->{title} || 'dummy' );
-    $entry->summary( $param->{summary} ) if $param->{summary};
+#    $entry->title( $param->{title} || 'dummy' );
+#    $entry->summary( $param->{summary} ) if $param->{summary};
+    $entry->add( undef, 'title', $param->{title} || 'dummy');
+    $entry->add( undef, 'summary',  $param->{summary} ) if $param->{summary};
 
     my $link = XML::Atom::Link->new;
     $link->type('text/html');

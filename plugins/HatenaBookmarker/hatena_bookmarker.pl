@@ -44,36 +44,46 @@ q(<$mt:BlogName encode_html="1"$>: <$mt:EntryTitle encode_html="1"$>)
 );
 MT->add_plugin($plugin);
 
-sub instance { $plugin }
-
 sub init_registry {
     my $plugin = shift;
-    my $pkg = 'HatenaBookmarker::CMS::';
+    my $pkg    = 'HatenaBookmarker::CMS::';
+    my $registry;
     if ( !MT->instance->isa('MT::App::CMS') ) {
         $plugin->registry(
-            { callbacks => { 'MT::Entry::post_save' => "${pkg}post_save_entry" } } );
+            {
+                callbacks =>
+                  { 'MT::Entry::post_save' => "${pkg}post_save_entry" }
+            }
+        );
         return;
     }
     $plugin->registry(
         {
-            callbacks    => { 'cms_post_save.entry' => "${pkg}cms_post_save_entry" },
+            callbacks =>
+              { 'cms_post_save.entry' => "${pkg}cms_post_save_entry" },
             applications => {
                 cms => {
                     list_actions => {
                         entry => {
                             bookmark_entry => {
-                                label => 'Bookmark Entries',
-                                continue_prompt =>
-'Are you sure you want to bookmark the selected entries?',
+                                label                   => 'Bookmark Entries',
+                                continue_prompt_handler => sub {
+                                    $plugin->translate(
+'Are you sure you want to bookmark the selected entries?'
+                                    );
+                                },
                                 code       => "${pkg}bookmark_entries",
                                 permission => 'create_post',
                             }
                         },
                         page => {
                             bookmark_page => {
-                                label => 'Bookmark Pages',
-                                continue_prompt =>
-'Are you sure you want to bookmark the selected pages?',
+                                label                   => 'Bookmark Pages',
+                                continue_prompt_handler => sub {
+                                    $plugin->translate(
+'Are you sure you want to bookmark the selected pages?'
+                                    );
+                                },
                                 code       => "${pkg}bookmark_entries",
                                 permission => 'create_post',
                             }
