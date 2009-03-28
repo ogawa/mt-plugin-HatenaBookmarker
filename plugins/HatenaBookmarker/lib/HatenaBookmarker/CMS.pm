@@ -9,12 +9,17 @@ use MT::Util;
 ## handlers
 ##
 sub post_save_entry {
-    my $class = shift;
-    my $app = MT->instance;
+    my $class   = shift;
+    my $app     = MT->instance;
     my ($entry) = @_;
     return
       unless $entry->isa('MT::Entry') && $entry->status == MT::Entry::RELEASE();
-    MT::Util::start_background_task( sub { bookmark_entry( $app, $entry ) } );
+    MT::Util::start_background_task(
+        sub {
+            bookmark_entry( $app, $entry )
+              or return $app->error( $app->errstr );
+        }
+    );
 }
 
 sub cms_post_save_entry {
@@ -22,7 +27,12 @@ sub cms_post_save_entry {
     my ( $app, $entry ) = @_;
     return
       unless $entry->isa('MT::Entry') && $entry->status == MT::Entry::RELEASE();
-    MT::Util::start_background_task( sub { bookmark_entry( $app, $entry ) } );
+    MT::Util::start_background_task(
+        sub {
+            bookmark_entry( $app, $entry )
+              or return $app->error( $app->errstr );
+        }
+    );
 }
 
 sub bookmark_entries {
@@ -43,7 +53,8 @@ sub bookmark_entries {
                 my $entry = $class->load($entry_id)
                   or return $app->trans_error('Invalid entry_id');
                 if ( $entry->status == MT::Entry::RELEASE() ) {
-                    bookmark_entry( $app, $entry );
+                    bookmark_entry( $app, $entry )
+                      or return $app->error( $app->errstr );
                 }
             }
         }
@@ -62,8 +73,12 @@ sub bookmark_entry {
     my $entry_id = $entry->id;
     my $plugin   = $app->component('hatena_bookmarker');
     my $config   = $plugin->get_config_hash( 'blog:' . $blog_id ) or return;
-    my $username = $config->{hatena_username} or return;
-    my $password = $config->{hatena_password} or return;
+    my $username = $config->{hatena_username}
+      or return $app->error(
+        $plugin->translate('You need to configure your hatena username.') );
+    my $password = $config->{hatena_password}
+      or return $app->error(
+        $plugin->translate('You need to configure your hatena password.') );
 
     require HatenaBookmarker::Client;
     my $client = HatenaBookmarker::Client->new;
