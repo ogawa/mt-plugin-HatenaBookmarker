@@ -17,7 +17,7 @@ our $VERSION = '0.10';
 
 my $plugin = __PACKAGE__->new(
     {
-        id   => 'hatena_bookmaker',
+        id   => 'hatena_bookmarker',
         name => 'Hatena Bookmarker',
         description =>
 q(<MT_TRANS phrase="HatenaBookmaker allows you to create a hatena bookmark to your entry when publishing entries.">),
@@ -47,7 +47,6 @@ MT->add_plugin($plugin);
 sub init_registry {
     my $plugin = shift;
     my $pkg    = 'HatenaBookmarker::CMS::';
-    my $registry;
     if ( !MT->instance->isa('MT::App::CMS') ) {
         $plugin->registry(
             {

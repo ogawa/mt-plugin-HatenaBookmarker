@@ -119,17 +119,15 @@ sub bookmark_entry {
         return;
     }
 
-    my $saved_title   = $bookmark->title;
-    my $saved_summary = get_bookmark_summary($bookmark);
-    my $title         = format_bm_title( $config->{hatena_bm_title}, $entry );
-    my $summary       = get_entry_summary($entry);
+    my $title = _create_bm_title( $entry, $config->{hatena_bm_title} );
+    my $summary = _create_bm_summary($entry);
 
     my $enc = $app->config->PublishCharset || 'utf-8';
     require MT::I18N;
     $title   = MT::I18N::encode_text( $title,   $enc, 'utf-8' ) if $title;
     $summary = MT::I18N::encode_text( $summary, $enc, 'utf-8' ) if $summary;
 
-    if ( $saved_title eq $title && $saved_summary eq $summary ) {
+    if ( $bookmark->title eq $title && $bookmark->summary eq $summary ) {
         $app->log(
             {
                 message => $plugin->translate(
@@ -143,50 +141,43 @@ sub bookmark_entry {
         return;
     }
 
-    if (
-        $client->updateBookmarkEntry(
-            $editURI,
-            {
-                $title   ? ( title   => $title )   : (),
-                $summary ? ( summary => $summary ) : ()
-            }
-        )
-      )
-    {
-        $app->log(
-            {
+    my $res = $client->updateBookmarkEntry(
+        $editURI,
+        {
+            $title   ? ( title   => $title )   : (),
+            $summary ? ( summary => $summary ) : ()
+        }
+    );
+    $app->log(
+        {
+            $res
+            ? (
                 message => $plugin->translate(
                     'Entry (ID:[_1]) has been successfully bookmarked.',
                     $entry_id
                 ),
-                level    => MT::Log::INFO(),
-                class    => 'entry',
-                metadata => $entry_id,
-            }
-        );
-    }
-    else {
-        $app->log(
-            {
+                level => MT::Log::INFO()
+              )
+            : (
                 message => $plugin->translate(
                     'Entry (ID:[_1]) has been failed to bookmark: [_2]',
                     $entry_id, $client->errstr
                 ),
-                level    => MT::Log::ERROR(),
-                class    => 'entry',
-                metadata => $entry_id,
-            }
-        );
-    }
+                level => MT::Log::ERROR()
+            ),
+            class    => 'entry',
+            metadata => $entry_id,
+        }
+    );
 }
 
 ##
 ## utilities
 ##
 
-# format bookmark title
-sub format_bm_title {
-    my ( $format, $entry ) = @_;
+# create a bookmark title from an MT::Entry and a format string
+sub _create_bm_title {
+    my ( $entry, $format ) = @_;
 
     require MT::Template::Context;
     my $ctx = MT::Template::Context->new;
@@ -203,19 +194,8 @@ sub format_bm_title {
     $title;
 }
 
-# extract summary text from a hatena entry
-sub get_bookmark_summary {
-    my $entry   = shift;
-    my $summary = '';
-    my $dc_ns   = 'http://purl.org/dc/elements/1.1/';
-    for my $subject ( $entry->getlist( $dc_ns, 'subject' ) ) {
-        $summary .= '[' . $subject . ']';
-    }
-    $summary;
-}
-
-# extract summary text from an MT entry
-sub get_entry_summary {
+# create a bookmark summary from an MT::Entry
+sub _create_bm_summary {
     my $entry = shift;
     _tags_to_text($entry) || _keywords_to_text($entry) || '';
 }
