@@ -13,7 +13,7 @@ use base qw( MT::Plugin );
 
 use MT 4.2;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 my $plugin = __PACKAGE__->new(
     {

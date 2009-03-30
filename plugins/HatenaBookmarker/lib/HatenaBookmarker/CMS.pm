@@ -9,27 +9,19 @@ use MT::Util;
 ## handlers
 ##
 sub post_save_entry {
-    my $class   = shift;
-    my $app     = MT->instance;
-    my ($entry) = @_;
-    return
-      unless $entry->isa('MT::Entry') && $entry->status == MT::Entry::RELEASE();
-    MT::Util::start_background_task(
-        sub {
-            bookmark_entry( $app, $entry )
-              or return $app->error( $app->errstr );
-        }
-    );
+    my $class = shift;
+    $class->cms_post_save_entry( MT->instance, @_ );
 }
 
 sub cms_post_save_entry {
     my $class = shift;
-    my ( $app, $entry ) = @_;
+    my ( $app, $obj ) = @_;
+    require MT::Entry;
     return
-      unless $entry->isa('MT::Entry') && $entry->status == MT::Entry::RELEASE();
+      unless $obj->isa('MT::Entry') && $obj->status == MT::Entry::RELEASE();
     MT::Util::start_background_task(
         sub {
-            bookmark_entry( $app, $entry )
+            bookmark_entry( $app, $obj )
               or return $app->error( $app->errstr );
         }
     );
@@ -44,16 +36,16 @@ sub bookmark_entries {
     my $type = $app->param('_type') || 'entry';
     my $class = MT->model($type);
 
-    my @entry_ids = $app->param('id')
+    my @obj_ids = $app->param('id')
       or return $app->error(
         $app->translate( 'No [_1] was selected to bookmark.', $type ) );
     MT::Util::start_background_task(
         sub {
-            for my $entry_id (@entry_ids) {
-                my $entry = $class->load($entry_id)
+            for my $obj_id (@obj_ids) {
+                my $obj = $class->load($obj_id)
                   or return $app->trans_error('Invalid entry_id');
-                if ( $entry->status == MT::Entry::RELEASE() ) {
-                    bookmark_entry( $app, $entry )
+                if ( $obj->status == MT::Entry::RELEASE() ) {
+                    bookmark_entry( $app, $obj )
                       or return $app->error( $app->errstr );
                 }
             }
@@ -67,10 +59,12 @@ sub bookmark_entries {
 ##
 
 sub bookmark_entry {
-    my ( $app, $entry ) = @_;
+    my ( $app, $obj ) = @_;
 
-    my $blog_id  = $entry->blog_id;
-    my $entry_id = $entry->id;
+    my $blog_id    = $obj->blog_id;
+    my $obj_id     = $obj->id;
+    my $class_type = $obj->class_type;
+
     my $plugin   = $app->component('hatena_bookmarker');
     my $config   = $plugin->get_config_hash( 'blog:' . $blog_id ) or return;
     my $username = $config->{hatena_username}
@@ -85,18 +79,18 @@ sub bookmark_entry {
     $client->username($username);
     $client->password($password);
 
-    my $editURI = $client->createBookmarkEntry( { url => $entry->permalink, } );
+    my $editURI = $client->createBookmarkEntry( { url => $obj->permalink, } );
     require MT::Log;
     unless ($editURI) {
         $app->log(
             {
                 message => $plugin->translate(
                     'Entry (ID:[_1]) has been failed to bookmark: [_2]',
-                    $entry_id, $client->errstr
+                    $obj_id, $client->errstr
                 ),
                 level    => MT::Log::ERROR(),
-                class    => 'entry',
-                metadata => $entry_id,
+                class    => $class_type,
+                metadata => $obj_id,
             }
         );
         return;
@@ -108,19 +102,19 @@ sub bookmark_entry {
             {
                 message => $plugin->translate(
 'Entry (ID:[_1]) has been bookmarked, but has caused an error: [_2]',
-                    $entry_id,
+                    $obj_id,
                     $client->errstr
                 ),
                 level    => MT::Log::ERROR(),
-                class    => 'entry',
-                metadata => $entry_id,
+                class    => $class_type,
+                metadata => $obj_id,
             }
         );
         return;
     }
 
-    my $title = _create_bm_title( $entry, $config->{hatena_bm_title} );
-    my $summary = _create_bm_summary($entry);
+    my $title = _create_bm_title( $obj, $config->{hatena_bm_title} );
+    my $summary = _create_bm_summary($obj);
 
     my $enc = $app->config->PublishCharset || 'utf-8';
     require MT::I18N;
@@ -131,11 +125,11 @@ sub bookmark_entry {
         $app->log(
             {
                 message => $plugin->translate(
-                    'Entry (ID:[_1]) has been skipped to bookmark.', $entry_id
+                    'Entry (ID:[_1]) has been skipped to bookmark.', $obj_id
                 ),
                 level    => MT::Log::INFO(),
-                class    => 'entry',
-                metadata => $entry_id,
+                class    => $class_type,
+                metadata => $obj_id,
             }
         );
         return;
@@ -153,20 +147,19 @@ sub bookmark_entry {
             $res
             ? (
                 message => $plugin->translate(
-                    'Entry (ID:[_1]) has been successfully bookmarked.',
-                    $entry_id
+                    'Entry (ID:[_1]) has been successfully bookmarked.', $obj_id
                 ),
                 level => MT::Log::INFO()
               )
             : (
                 message => $plugin->translate(
                     'Entry (ID:[_1]) has been failed to bookmark: [_2]',
-                    $entry_id, $client->errstr
+                    $obj_id, $client->errstr
                 ),
                 level => MT::Log::ERROR()
             ),
-            class    => 'entry',
-            metadata => $entry_id,
+            class    => $class_type,
+            metadata => $obj_id,
         }
     );
 }
@@ -177,12 +170,12 @@ sub bookmark_entry {
 
 # create a bookmark title from an MT::Entry and a format string
 sub _create_bm_title {
-    my ( $entry, $format ) = @_;
+    my ( $obj, $format ) = @_;
 
     require MT::Template::Context;
     my $ctx = MT::Template::Context->new;
-    $ctx->stash( 'entry', $entry );
-    $ctx->stash( 'blog',  $entry->blog );
+    $ctx->stash( 'entry', $obj );
+    $ctx->stash( 'blog',  $obj->blog );
 
     require MT::Builder;
     my $builder = MT::Builder->new;
@@ -196,17 +189,17 @@ sub _create_bm_title {
 
 # create a bookmark summary from an MT::Entry
 sub _create_bm_summary {
-    my $entry = shift;
-    _tags_to_text($entry) || _keywords_to_text($entry) || '';
+    my $obj = shift;
+    _tags_to_text($obj) || _keywords_to_text($obj) || '';
 }
 
 # convert entry tags to a flattened text
 sub _tags_to_text {
-    my $entry = shift;
-    return '' unless $entry->can('tags');
+    my $obj = shift;
+    return '' unless $obj->isa('MT::Taggable');
 
     my $text = '';
-    for my $tag ( $entry->tags ) {
+    for my $tag ( $obj->tags ) {
         $text .= '[' . $tag . ']';
     }
     $text;
@@ -214,8 +207,8 @@ sub _tags_to_text {
 
 # convert entry keywords to a flattened text
 sub _keywords_to_text {
-    my $entry = shift;
-    my $str = $entry->keywords or return '';
+    my $obj = shift;
+    my $str = $obj->keywords or return '';
     $str =~ s/\#.*$//g;
     $str =~ s/(^\s+|\s+$)//g;
     return '' unless $str;
