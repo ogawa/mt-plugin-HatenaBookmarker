@@ -61,9 +61,10 @@ sub bookmark_entries {
 sub bookmark_entry {
     my ( $app, $obj ) = @_;
 
-    my $blog_id    = $obj->blog_id;
-    my $obj_id     = $obj->id;
-    my $class_type = $obj->class_type;
+    my $blog_id     = $obj->blog_id;
+    my $obj_id      = $obj->id;
+    my $class_label = $obj->class_label;
+    my $class_type  = $obj->class_type;
 
     my $plugin   = $app->component('hatena_bookmarker');
     my $config   = $plugin->get_config_hash( 'blog:' . $blog_id ) or return;
@@ -85,8 +86,8 @@ sub bookmark_entry {
         $app->log(
             {
                 message => $plugin->translate(
-                    'Entry (ID:[_1]) has been failed to bookmark: [_2]',
-                    $obj_id, $client->errstr
+                    '[_1] (ID:[_2]) has been failed to bookmark: [_3]',
+                    $class_label, $obj_id, $client->errstr
                 ),
                 level    => MT::Log::ERROR(),
                 class    => $class_type,
@@ -101,9 +102,8 @@ sub bookmark_entry {
         $app->log(
             {
                 message => $plugin->translate(
-'Entry (ID:[_1]) has been bookmarked, but has caused an error: [_2]',
-                    $obj_id,
-                    $client->errstr
+'[_1] (ID:[_2]) has been bookmarked, but has caused an error: [_3]',
+                    $class_label, $obj_id, $client->errstr
                 ),
                 level    => MT::Log::ERROR(),
                 class    => $class_type,
@@ -125,7 +125,8 @@ sub bookmark_entry {
         $app->log(
             {
                 message => $plugin->translate(
-                    'Entry (ID:[_1]) has been skipped to bookmark.', $obj_id
+                    '[_1] (ID:[_2]) has been skipped to bookmark.',
+                    $class_label, $obj_id
                 ),
                 level    => MT::Log::INFO(),
                 class    => $class_type,
@@ -147,14 +148,15 @@ sub bookmark_entry {
             $res
             ? (
                 message => $plugin->translate(
-                    'Entry (ID:[_1]) has been successfully bookmarked.', $obj_id
+                    '[_1] (ID:[_2]) has been successfully bookmarked.',
+                    $class_label, $obj_id
                 ),
                 level => MT::Log::INFO()
               )
             : (
                 message => $plugin->translate(
-                    'Entry (ID:[_1]) has been failed to bookmark: [_2]',
-                    $obj_id, $client->errstr
+                    '[_1] (ID:[_2]) has been failed to bookmark: [_3]',
+                    $class_label, $obj_id, $client->errstr
                 ),
                 level => MT::Log::ERROR()
             ),

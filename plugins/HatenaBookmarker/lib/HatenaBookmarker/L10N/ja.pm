@@ -6,14 +6,14 @@ use vars qw( %Lexicon );
 %Lexicon = (
 'HatenaBookmaker allows you to create a hatena bookmark to your entry when publishing entries.'
       => 'HatenaBookmarkerを用いると、ブログ記事などの公開時にその記事への「はてなブックマーク」を生成することができます。',
-    'Entry (ID:[_1]) has been failed to bookmark: [_2]' =>
-      'エントリ (ID:[_1]) のブックマークに失敗しました: [_2]',
-    'Entry (ID:[_1]) has been bookmarked, but has caused an error: [_2]' =>
-'エントリ (ID:[_1]) はブックマークされましたが、何らかのエラーが発生しました: [_2]',
-    'Entry (ID:[_1]) has been skipped to bookmark.' =>
-'エントリ (ID:[_1]) のブックマークは重複しているためスキップされました。',
-    'Entry (ID:[_1]) has been successfully bookmarked.' =>
-      'エントリ (ID:[_1]) は正常にブックマークされました。',
+    '[_1] (ID:[_2]) has been failed to bookmark: [_3]' =>
+      '[_1] (ID:[_2]) のブックマークに失敗しました: [_3]',
+    '[_1] (ID:[_2]) has been bookmarked, but has caused an error: [_3]' =>
+'[_1] (ID:[_2]) はブックマークされましたが、何らかのエラーが発生しました: [_3]',
+    '[_1] (ID:[_2]) has been skipped to bookmark.' =>
+'[_1] (ID:[_2]) のブックマークは重複しているためスキップされました。',
+    '[_1] (ID:[_2]) has been successfully bookmarked.' =>
+      '[_1] (ID:[_2]) は正常にブックマークされました。',
     'Hatena Username'       => 'はてなIDのユーザ名',
     'Hatena Password'       => 'はてなIDのパスワード',
     'Bookmark Title Format' => 'ブックマークのタイトルの形式',
@@ -23,6 +23,10 @@ use vars qw( %Lexicon );
     'Bookmark Pages' => 'ウェブページのブックマーク',
     'Are you sure you want to bookmark the selected pages?' =>
 '選択したウェブページをブックマークしてよろしいですか?',
+    'You need to configure your hatena username.' =>
+      'はてなIDのユーザ名を設定する必要があります。',
+    'You need to configure your hatena password.' =>
+      'はてなIDのパスワードを設定する必要があります。',
 );
 
 1;
