@@ -10,7 +10,7 @@ use MT::Util;
 ##
 sub post_save_entry {
     my $class = shift;
-    $class->cms_post_save_entry( MT->instance, @_ );
+    cms_post_save_entry( $class, MT->instance, @_ );
 }
 
 sub cms_post_save_entry {
