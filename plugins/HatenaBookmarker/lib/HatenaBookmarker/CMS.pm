@@ -113,7 +113,8 @@ sub bookmark_entry {
         return;
     }
 
-    my $title = _create_bm_title( $obj, $config->{hatena_bm_title} );
+    my $title = _create_bm_title( $obj, $config->{hatena_bm_title} )
+      or return $app->error($app->errstr);
     my $summary = _create_bm_summary($obj);
 
     my $enc = $app->config->PublishCharset || 'utf-8';
@@ -186,7 +187,7 @@ sub _create_bm_title {
     defined( my $title = $builder->build( $ctx, $tokens ) )
       or return $ctx->error( $builder->errstr );
 
-    $title;
+    $title || 'no title';
 }
 
 # create a bookmark summary from an MT::Entry
